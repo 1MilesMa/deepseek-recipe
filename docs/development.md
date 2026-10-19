@@ -24,12 +24,17 @@ sudo apt install -y build-essential pkg-config clang libclang-dev libopencv-dev
 
 For Python development on Debian, also install `python3-dev` and `python3-venv`.
 
-Use OpenCV 4.x for this workspace. The pinned Rust `opencv` 0.93 bindings
-support OpenCV 3.4 and 4.x, not OpenCV 5.x. For other systems or a custom
-installation, follow the binding version's [installation guide][opencv-install]
-and [troubleshooting guide][opencv-troubleshooting]. Configure
-`PKG_CONFIG_PATH`, `OpenCV_DIR`, or `LIBCLANG_PATH` as appropriate for your
-installation.
+Use OpenCV 4.11 or newer for this workspace. OpenCV 4.11 reads an animated WebP
+as its first frame, while an earlier release returns an empty matrix for the
+same image. The pinned Rust `opencv` 0.93 bindings support OpenCV 3.4 and 4.x,
+not OpenCV 5.x. For other systems or a custom installation, follow the binding
+version's [installation guide][opencv-install] and
+[troubleshooting guide][opencv-troubleshooting]. Configure `PKG_CONFIG_PATH`,
+`OpenCV_DIR`, or `LIBCLANG_PATH` as appropriate for your installation.
+
+The `libopencv-dev` of Debian 12 predates 4.11. Build the OpenCV of the wheel as
+described in [Building the Python wheel](build-python-wheel.md) to develop against
+a newer release.
 
 To check an OpenCV 4 installation discovered through pkg-config:
 
@@ -114,76 +119,13 @@ For an installation without editable development, use:
 python3 -m pip install ./deepseek-recipe-python
 ```
 
-## Wheel packaging
+## Python wheel
 
-The extension links OpenCV dynamically, so a wheel is only installable on a
-machine with a matching OpenCV until the libraries are copied into it:
-`delocate` on macOS, `auditwheel` on Linux. The libraries of the build machine
-become part of the wheel, so the maintainer builds the wheel against an OpenCV
-that is small enough to bundle.
-
-Build that OpenCV from source, with only the modules the extension uses. The
-build disables OpenCL, TBB, OpenEXR, and TIFF because each of them links its
-own libraries, which the wheel would then have to include.
-
-```sh
-git clone --depth 1 --branch 4.12.0 https://github.com/opencv/opencv.git
-cmake -S opencv -B opencv/build \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="$PWD/target/opencv-min" \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-    -DBUILD_SHARED_LIBS=ON \
-    -DBUILD_LIST=core,imgproc,imgcodecs \
-    -DWITH_OPENCL=OFF -DWITH_TBB=OFF -DWITH_OPENEXR=OFF -DWITH_TIFF=OFF \
-    -DWITH_JPEG=ON -DWITH_PNG=ON -DWITH_WEBP=ON
-cmake --build opencv/build --parallel
-cmake --install opencv/build
-```
-
-Keep `CMAKE_OSX_DEPLOYMENT_TARGET` at the oldest macOS release that the wheel
-should support: the installed libraries determine the platform tag of the wheel.
-
-Then build the wheel against that OpenCV, and copy its libraries into it:
-
-```sh
-cd deepseek-recipe-python
-export OPENCV_INCLUDE_PATHS="$PWD/../target/opencv-min/include/opencv4"
-export OPENCV_LINK_PATHS="$PWD/../target/opencv-min/lib"
-export OPENCV_LINK_LIBS=opencv_core,opencv_imgproc,opencv_imgcodecs
-maturin build --release
-delocate-wheel -w dist-repaired dist/*.whl      # `auditwheel repair` on Linux
-twine check dist-repaired/*
-```
-
-The `OPENCV_*` variables take precedence over pkg-config, so the build does not
-use an OpenCV installed elsewhere on the build machine. The linker still
-resolves `-lopencv_core` in the order of its search paths, so when the linker
-flags of the build machine already name the directory of another OpenCV, add
-this one first:
-
-```sh
-export RUSTFLAGS="-L$PWD/../target/opencv-min/lib ${RUSTFLAGS:-}"
-```
-
-On macOS this produces a wheel of about 8 MB; bundling an OpenCV installed by a
-package manager produces a much larger one, because that build links every
-library of its own dependencies.
-
-Upload the repaired artifacts after checking them against TestPyPI:
-
-```sh
-twine upload --repository testpypi deepseek-recipe-python/dist-repaired/*
-twine upload deepseek-recipe-python/dist-repaired/*
-```
-
-An upload authenticates with an API token: `__token__` as the user name and the
-token as the password, in `~/.pypirc` or in `TWINE_USERNAME` and
-`TWINE_PASSWORD`.
-
-The wheel bundles OpenCV and the codecs that its `imgcodecs` module compiles in,
-so it also includes their license texts:
-`deepseek-recipe-python/THIRD_PARTY_LICENSES` reproduces them and the package
-declares the file as a license file.
+[Building the Python wheel](build-python-wheel.md) describes a native build: the
+requirements of the build machine, the minimal OpenCV that keeps the wheel small,
+the build with `maturin`, the bundling of the native libraries, and the checks of
+the artifacts. It also covers the platform tags, the licenses of the bundled
+libraries, and the upload to a package index.
 
 ## API documentation
 
