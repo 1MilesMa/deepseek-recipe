@@ -15,10 +15,7 @@ doc = false
 deepseek-recipe = { workspace = true }
 deepseek-recipe-core = { workspace = true }
 deepseek-recipe-encoding = { workspace = true }
-deepseek-recipe-image = { workspace = true, features = [
-    "opencv-preprocess",
-    "reqwest-fetch",
-] }
+deepseek-recipe-image = { workspace = true, features = ["reqwest-fetch"] }
 futures = { workspace = true }
 pyo3 = { version = "0.27", features = ["abi3-py310"] }
 serde = { workspace = true }
