@@ -27,7 +27,7 @@ data-url = "0.3.2"
 deepseek-recipe = { version = "0.2.0", path = "deepseek-recipe" }
 deepseek-recipe-core = { version = "0.2.0", path = "deepseek-recipe-core" }
 deepseek-recipe-encoding = { version = "0.2.0", path = "deepseek-recipe-encoding" }
-deepseek-recipe-image = { version = "0.2.0", path = "deepseek-recipe-image" }
+deepseek-recipe-image = { version = "0.2.0", path = "deepseek-recipe-image", default-features = false }
 deepseek-recipe-macros = { version = "0.2.0", path = "deepseek-recipe-macros" }
 futures = "0.3.31"
 image = { version = "0.25.0", default-features = false, features = [
