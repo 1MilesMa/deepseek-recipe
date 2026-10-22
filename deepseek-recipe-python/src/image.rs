@@ -7,7 +7,7 @@ use std::sync::Arc;
 use deepseek_recipe_core::multimodal::{ImageInfo, MultiModalData};
 use deepseek_recipe_image::{
     DestinationFilter, ImageByteBudget, ImageError as RustImageError, ImageFetcher,
-    ImagePreprocessor, ImageQuota, ImageResolver, OpenCvImagePreprocessor, PreprocessOptions,
+    ImagePreprocessor, ImageQuota, ImageResolver, PreprocessOptions,
     ReqwestImageFetcher,
 };
 use pyo3::exceptions::{PyException, PyRuntimeError, PyTypeError, PyValueError};
@@ -15,6 +15,12 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
 use crate::conversation::{PyImageSource, image_detail_str, parse_image_detail};
+
+/// Builds without OpenCV: `preprocess` reports `Unsupported`.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct OpenCvImagePreprocessor;
+
+impl ImagePreprocessor for OpenCvImagePreprocessor {}
 
 pyo3::create_exception!(
     _native,
