@@ -1,0 +1,69 @@
+name: build-deepseek-recipe-wheel
+
+# 手动触发：仓库页面 Actions -> build-deepseek-recipe-wheel -> Run workflow
+on:
+  workflow_dispatch:
+
+jobs:
+  wheel:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust 1.97.1
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+
+      - name: Install OpenCV and export build paths
+        shell: pwsh
+        run: |
+          choco install opencv -y --no-progress
+          $ocv = "C:\tools\opencv\build"
+          if (-not (Test-Path $ocv)) { throw "OpenCV 安装路径不存在: $ocv" }
+          $lib = Get-ChildItem "$ocv\x64\vc16\lib" -Filter "opencv_world*.lib" |
+                 Where-Object { $_.Name -notmatch "d\.lib$" } |
+                 Select-Object -First 1
+          if (-not $lib) { throw "找不到 opencv_world*.lib" }
+          $bin = Join-Path (Split-Path $lib.DirectoryName -Parent) "bin"
+          New-Item -ItemType Directory -Force dist\dll | Out-Null
+          Copy-Item (Join-Path $bin "$($lib.BaseName).dll") dist\dll\ -Force
+          "OPENCV_INCLUDE_PATHS=$ocv\include" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OPENCV_LINK_PATHS=$($lib.DirectoryName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OPENCV_LINK_LIBS=$($lib.BaseName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "OpenCV lib: $($lib.FullName)"
+          Write-Host "OpenCV dll: $bin\$($lib.BaseName).dll"
+
+      - name: Export LIBCLANG_PATH
+        shell: pwsh
+        run: |
+          $dll = "C:\Program Files\LLVM\bin\libclang.dll"
+          if (Test-Path $dll) {
+            "LIBCLANG_PATH=C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            Write-Warning "libclang.dll 未找到，opencv crate 可能编译失败"
+          }
+
+      - name: Build wheel with maturin
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip maturin
+          maturin build --release --out dist --manifest-path deepseek-recipe-python/Cargo.toml
+
+      - name: Show artifacts
+        shell: pwsh
+        run: Get-ChildItem dist -Recurse | Select-Object FullName,Length | Format-Table -AutoSize
+
+      - name: Upload wheel and OpenCV DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseek-recipe-windows
+          path: dist/**
+          if-no-files-found: error
