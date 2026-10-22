@@ -1,6 +1,8 @@
 name: build-deepseek-recipe-wheel
 
-# 手动触发：仓库页面 Actions -> build-deepseek-recipe-wheel -> Run workflow
+# Manual trigger: Actions -> build-deepseek-recipe-wheel -> Run workflow.
+# This fork builds WITHOUT OpenCV, so image preprocessing is unavailable;
+# protocol conversion, prompt rendering and tokenizer work normally.
 on:
   workflow_dispatch:
 
@@ -22,35 +24,6 @@ jobs:
         with:
           toolchain: 1.97.1
 
-      - name: Install OpenCV and export build paths
-        shell: pwsh
-        run: |
-          choco install opencv -y --no-progress
-          $ocv = "C:\tools\opencv\build"
-          if (-not (Test-Path $ocv)) { throw "OpenCV 安装路径不存在: $ocv" }
-          $lib = Get-ChildItem "$ocv\x64\vc16\lib" -Filter "opencv_world*.lib" |
-                 Where-Object { $_.Name -notmatch "d\.lib$" } |
-                 Select-Object -First 1
-          if (-not $lib) { throw "找不到 opencv_world*.lib" }
-          $bin = Join-Path (Split-Path $lib.DirectoryName -Parent) "bin"
-          New-Item -ItemType Directory -Force dist\dll | Out-Null
-          Copy-Item (Join-Path $bin "$($lib.BaseName).dll") dist\dll\ -Force
-          "OPENCV_INCLUDE_PATHS=$ocv\include" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "OPENCV_LINK_PATHS=$($lib.DirectoryName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "OPENCV_LINK_LIBS=$($lib.BaseName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "OpenCV lib: $($lib.FullName)"
-          Write-Host "OpenCV dll: $bin\$($lib.BaseName).dll"
-
-      - name: Export LIBCLANG_PATH
-        shell: pwsh
-        run: |
-          $dll = "C:\Program Files\LLVM\bin\libclang.dll"
-          if (Test-Path $dll) {
-            "LIBCLANG_PATH=C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          } else {
-            Write-Warning "libclang.dll 未找到，opencv crate 可能编译失败"
-          }
-
       - name: Build wheel with maturin
         shell: pwsh
         run: |
@@ -61,9 +34,9 @@ jobs:
         shell: pwsh
         run: Get-ChildItem dist -Recurse | Select-Object FullName,Length | Format-Table -AutoSize
 
-      - name: Upload wheel and OpenCV DLL
+      - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:
           name: deepseek-recipe-windows
-          path: dist/**
+          path: dist/*.whl
           if-no-files-found: error
