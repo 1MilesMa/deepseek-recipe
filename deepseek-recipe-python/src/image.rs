@@ -17,7 +17,7 @@ use pyo3::types::PyBytes;
 use crate::conversation::{PyImageSource, image_detail_str, parse_image_detail};
 
 /// Builds without OpenCV: `preprocess` reports `Unsupported`.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct OpenCvImagePreprocessor;
 
 impl ImagePreprocessor for OpenCvImagePreprocessor {}
